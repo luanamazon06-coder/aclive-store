@@ -980,7 +980,7 @@
       </div>
     </div>
 
-    <div class="support-line">Dúvidas ou problemas com o pagamento? Fale com o Luan pelo WhatsApp: <a href="https://wa.me/5516996263295" target="_blank" rel="noopener">(16) 99626-3295</a></div>
+    <div class="support-line">Dúvidas ou problemas com o pagamento? Fale com o Luan pelo WhatsApp: <a href="https://wa.me/5516996263295" target="_blank" rel="noopener" id="whatsappLink">(16) 99626-3295</a></div>
   </div>
 </section>
 
@@ -996,6 +996,7 @@
   <div class="admin-bar-actions">
     <button class="btn-primary" id="saveAllBtn" type="button">💾 Salvar alterações</button>
     <button class="btn-ghost" id="editPlansBtn" type="button">Editar preços</button>
+    <button class="btn-ghost" id="editContactBtn" type="button">Editar WhatsApp</button>
     <button class="btn-ghost" id="subscribersBtn" type="button">Assinantes</button>
     <button class="btn-ghost" id="pageBgBtn" type="button">Fundo da página</button>
     <button class="btn-ghost" id="trialLinkBtn" type="button">Link de teste grátis</button>
@@ -1070,6 +1071,20 @@
     <div class="modal-actions">
       <button type="button" class="btn-primary" id="savePlansBtn">Salvar preços</button>
       <button type="button" class="btn-ghost" id="plansCloseBtn">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="contactModal" hidden>
+  <div class="modal-box">
+    <h3>WhatsApp de contato</h3>
+    <p class="trial-modal-desc">Esse número é usado no rodapé de pagamento e no pedido do teste grátis, pra todo mundo que visitar o site.</p>
+    <label>Número com DDD e código do país (só números)
+      <input type="text" id="contactWhatsappInput" placeholder="Ex: 5516996263295">
+    </label>
+    <div class="modal-actions">
+      <button type="button" class="btn-primary" id="saveContactBtn">Salvar</button>
+      <button type="button" class="btn-ghost" id="contactCloseBtn">Fechar</button>
     </div>
   </div>
 </div>
@@ -1859,6 +1874,58 @@
   var SUPPORT_WHATSAPP = '5516996263295';
   var TRIAL_DURATION_MS = 3 * 60 * 60 * 1000; // 3 horas
 
+  // ---------- CONTATO (WhatsApp editável) ----------
+  var DEFAULT_CONTACT = { whatsapp: '5516996263295' };
+  var contact = DEFAULT_CONTACT;
+  var whatsappLink = document.getElementById('whatsappLink');
+
+  function formatBRPhone(digits){
+    var d = String(digits || '').replace(/\D/g, '');
+    if (d.indexOf('55') === 0) d = d.slice(2);
+    var area = d.slice(0, 2);
+    var rest = d.slice(2);
+    if (rest.length === 9) return '(' + area + ') ' + rest.slice(0, 5) + '-' + rest.slice(5);
+    if (rest.length === 8) return '(' + area + ') ' + rest.slice(0, 4) + '-' + rest.slice(4);
+    return d;
+  }
+
+  function applyContact(data){
+    if (!data || !data.whatsapp) return;
+    SUPPORT_WHATSAPP = String(data.whatsapp).replace(/\D/g, '');
+    if (whatsappLink){
+      whatsappLink.href = 'https://wa.me/' + SUPPORT_WHATSAPP;
+      whatsappLink.textContent = formatBRPhone(SUPPORT_WHATSAPP);
+    }
+  }
+
+  applyContact(contact);
+  scGet('aclive_contact', contact).then(function(data){
+    contact = data;
+    applyContact(contact);
+  });
+
+  var contactModal = document.getElementById('contactModal');
+  var editContactBtn = document.getElementById('editContactBtn');
+  var contactCloseBtn = document.getElementById('contactCloseBtn');
+  var contactWhatsappInput = document.getElementById('contactWhatsappInput');
+  var saveContactBtn = document.getElementById('saveContactBtn');
+
+  editContactBtn.addEventListener('click', function(){
+    contactWhatsappInput.value = contact.whatsapp || '';
+    contactModal.hidden = false;
+  });
+  contactCloseBtn.addEventListener('click', function(){ contactModal.hidden = true; });
+  contactModal.addEventListener('click', function(e){ if (e.target === contactModal) contactModal.hidden = true; });
+
+  saveContactBtn.addEventListener('click', function(){
+    var digits = contactWhatsappInput.value.replace(/\D/g, '');
+    if (!digits){ contactModal.hidden = true; return; }
+    contact = { whatsapp: digits };
+    applyContact(contact);
+    reportSave(scSet('aclive_contact', contact), 'WhatsApp');
+    contactModal.hidden = true;
+  });
+
   function getStoredTrial(){
     try{
       var raw = localStorage.getItem('aclive_trial');
@@ -1997,7 +2064,8 @@
       ['aclive_gallery', 'Galeria de imagens'],
       ['aclive_page_bg', 'Fundo da página'],
       ['aclive_categories', 'Categorias (pills)'],
-      ['aclive_plans', 'Preços dos planos']
+      ['aclive_plans', 'Preços dos planos'],
+      ['aclive_contact', 'WhatsApp de contato']
     ];
     return Promise.all(contentKeys.map(function(k){
       return scGet(k[0], undefined).then(function(value){
@@ -2342,7 +2410,8 @@
       scSet('aclive_gallery', galleryItems),
       scSet('aclive_page_bg', pageBgData),
       scSet('aclive_categories', categories),
-      scSet('aclive_plans', plans)
+      scSet('aclive_plans', plans),
+      scSet('aclive_contact', contact)
     ]).then(function(){
       storageSet('aclive_subscribers', JSON.stringify(subscribers));
       showAdminNotice('Tudo salvo ✓ (' + new Date().toLocaleTimeString('pt-BR').slice(0,5) + ')');
