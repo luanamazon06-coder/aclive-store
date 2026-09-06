@@ -315,14 +315,32 @@
   }
 
   function renderPending(){
-    var pending = allOrders.filter(function(o){ return o.status === 'PAGAMENTO_APROVADO'; });
+    var awaitingPayment = allOrders.filter(function(o){ return o.status === 'AGUARDANDO_PAGAMENTO'; });
+    var approved = allOrders.filter(function(o){ return o.status === 'PAGAMENTO_APROVADO'; });
     var el = document.getElementById('pendingList');
-    if (pending.length === 0){
-      el.innerHTML = '<p class="empty-note">Nenhuma ativação pendente no momento.</p>';
+    el.innerHTML = '';
+
+    if (awaitingPayment.length > 0){
+      var h1 = document.createElement('h3');
+      h1.style.cssText = 'font-size:0.95rem; color:var(--ink-dim); margin: 4px 0 10px;';
+      h1.textContent = 'Aguardando confirmação de pagamento (combinado no WhatsApp) — ' + awaitingPayment.length;
+      el.appendChild(h1);
+      awaitingPayment.forEach(function(pedido){ el.appendChild(renderAwaitingPaymentCard(pedido)); });
+    }
+
+    var h2 = document.createElement('h3');
+    h2.style.cssText = 'font-size:0.95rem; color:var(--ink-dim); margin: 20px 0 10px;';
+    h2.textContent = 'Aguardando ativação — ' + approved.length;
+    el.appendChild(h2);
+
+    if (approved.length === 0){
+      var empty = document.createElement('p');
+      empty.className = 'empty-note';
+      empty.textContent = 'Nenhuma ativação pendente no momento.';
+      el.appendChild(empty);
       return;
     }
-    el.innerHTML = '';
-    pending.forEach(function(pedido){
+    approved.forEach(function(pedido){
       var cliente = pedido.cliente || {};
       var card = document.createElement('div');
       card.className = 'pending-card';
@@ -358,6 +376,54 @@
 
       el.appendChild(card);
     });
+  }
+
+  function renderAwaitingPaymentCard(pedido){
+    var cliente = pedido.cliente || {};
+    var card = document.createElement('div');
+    card.className = 'pending-card';
+    card.innerHTML =
+      '<div class="row">' +
+        '<div>' +
+          '<div class="name">' + (cliente.nome || '—') + '</div>' +
+          '<div class="meta">Pedido ' + pedido.order_code + ' · Plano: ' + pedido.plan_label + ' · ' + fmtMoney(pedido.valor) + '</div>' +
+          '<div class="meta">WhatsApp: ' + (cliente.whatsapp || '—') + ' · Recursos: ' + (Array.isArray(pedido.recursos) ? pedido.recursos.join(', ') : '—') + '</div>' +
+        '</div>' +
+        '<div>' + statusBadge(pedido) + '</div>' +
+      '</div>' +
+      '<div class="row" style="margin-top:12px;">' +
+        '<button class="btn btn-sm" data-action="mark-paid">Marcar como pago</button>' +
+        '<a class="btn-ghost btn-sm" style="text-decoration:none; display:inline-flex; align-items:center;" target="_blank" rel="noopener" href="https://wa.me/' + (cliente.whatsapp || '').replace(/[^0-9]/g, '') + '">Chamar no WhatsApp</a>' +
+        '<button class="btn-ghost btn-sm" data-action="view-timeline">Ver timeline</button>' +
+      '</div>';
+    card.querySelector('[data-action="mark-paid"]').addEventListener('click', function(){ markAsPaidManually(pedido, card); });
+    card.querySelector('[data-action="view-timeline"]').addEventListener('click', function(){ openTimeline(pedido); });
+    return card;
+  }
+
+  async function markAsPaidManually(pedido, card){
+    var sessionRes = await supabase.auth.getSession();
+    var user = sessionRes.data && sessionRes.data.session && sessionRes.data.session.user;
+    var btn = card.querySelector('[data-action="mark-paid"]');
+    btn.textContent = 'Confirmando...';
+    btn.disabled = true;
+    var res = await supabase.from('pedidos').update({
+      status: 'PAGAMENTO_APROVADO',
+      paid_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }).eq('id', pedido.id);
+    if (res.error){
+      alert('Não foi possível marcar como pago: ' + res.error.message);
+      btn.textContent = 'Marcar como pago';
+      btn.disabled = false;
+      return;
+    }
+    await supabase.from('pedido_logs').insert({
+      pedido_id: pedido.id,
+      evento: 'Pagamento confirmado manualmente (sem Stripe ainda)',
+      detalhe: 'por ' + (user ? user.email : 'admin')
+    });
+    await loadAll();
   }
 
   async function confirmActivation(pedido, card){
