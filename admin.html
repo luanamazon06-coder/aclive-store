@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aclive Store — Painel de vendas</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230E1512'/%3E%3Crect x='3' y='3' width='94' height='94' rx='19' fill='none' stroke='%232C6E63' stroke-width='2'/%3E%3Ctext x='50' y='71' font-family='Georgia, Cambria, serif' font-size='60' font-weight='600' fill='%23F0A85C' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0E1512; --surface: #16211C; --surface-2: #1C2A23;
+    --teal: #2C6E63; --teal-bright: #4E9C8E;
+    --amber: #E08A3C; --amber-bright: #F0A85C;
+    --ink: #F2EDE4; --ink-dim: #8FA69C;
+    --line: rgba(242,237,228,0.14);
+    --danger: #E0693C;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  body{
+    background: var(--bg); color: var(--ink);
+    font-family: 'Archivo', sans-serif; line-height:1.5;
+    min-height:100vh;
+  }
+  h1,h2,h3{ font-family:'Fraunces', serif; font-weight:600; }
+  a{ color: var(--teal-bright); }
+  .wrap{ max-width:1180px; margin:0 auto; padding: 24px 24px 60px; }
+  header{ display:flex; justify-content:space-between; align-items:center; padding: 16px 24px; border-bottom:1px solid var(--line); }
+  .logo{ font-family:'Fraunces', serif; font-size:1.2rem; font-weight:600; }
+  .logo span{ color: var(--amber-bright); }
+  button, input, select, textarea{ font-family: inherit; }
+  button{ cursor:pointer; }
+  .btn{ background: var(--amber-bright); color:#1a1006; border:1px solid var(--amber-bright); padding:9px 18px; font-size:0.88rem; font-weight:600; border-radius:4px; }
+  .btn:hover{ background: var(--amber); }
+  .btn-ghost{ background:transparent; color: var(--ink); border:1px solid var(--line); padding:9px 18px; font-size:0.88rem; border-radius:4px; }
+  .btn-ghost:hover{ border-color: var(--teal-bright); }
+  .btn-sm{ padding:5px 12px; font-size:0.78rem; }
+  input[type="text"], input[type="password"], input[type="email"], input[type="date"], input[type="number"], textarea, select{
+    width:100%; padding:9px 12px; background: var(--surface-2); border:1px solid var(--line);
+    color: var(--ink); border-radius:4px; font-size:0.9rem;
+  }
+  label{ display:block; font-size:0.8rem; color: var(--ink-dim); margin-bottom:14px; }
+  label input, label textarea, label select{ margin-top:6px; }
+
+  /* ---------- LOGIN ---------- */
+  #loginScreen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .login-box{ background: var(--surface); border:1px solid var(--line); padding:36px; width:100%; max-width:340px; border-radius:8px; }
+  .login-box h1{ font-size:1.4rem; margin-bottom:24px; text-align:center; }
+  .login-error{ color: var(--danger); font-size:0.82rem; margin-top:10px; }
+
+  /* ---------- INDICADORES ---------- */
+  .indicators{ display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin: 24px 0; }
+  .indicator{ background: var(--surface); border:1px solid var(--line); border-radius:8px; padding:16px; }
+  .indicator .num{ font-family:'Fraunces', serif; font-size:1.7rem; color: var(--amber-bright); }
+  .indicator .label{ font-size:0.78rem; color: var(--ink-dim); margin-top:4px; }
+
+  /* ---------- TABS ---------- */
+  .tabs{ display:flex; gap:6px; border-bottom:1px solid var(--line); margin-bottom:20px; }
+  .tab-btn{ background:transparent; border:none; color: var(--ink-dim); padding:10px 16px; font-size:0.9rem; border-bottom:2px solid transparent; }
+  .tab-btn.active{ color: var(--ink); border-bottom-color: var(--amber-bright); }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  /* ---------- ATIVAÇÕES PENDENTES ---------- */
+  .pending-card{ background: var(--surface); border:1px solid var(--line); border-radius:8px; padding:18px; margin-bottom:14px; }
+  .pending-card .row{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; align-items:flex-start; }
+  .pending-card .name{ font-family:'Fraunces', serif; font-size:1.1rem; }
+  .pending-card .meta{ font-size:0.85rem; color: var(--ink-dim); margin-top:4px; }
+  .badge{ display:inline-block; padding:3px 10px; border-radius:999px; font-size:0.72rem; font-weight:600; }
+  .badge-approved{ background: rgba(78,156,142,0.18); color: var(--teal-bright); }
+  .badge-pending{ background: rgba(224,138,60,0.18); color: var(--amber-bright); }
+  .badge-active{ background: rgba(78,156,142,0.25); color: var(--teal-bright); }
+  .badge-expiring{ background: rgba(224,138,60,0.25); color: var(--amber-bright); }
+  .badge-expired{ background: rgba(224,105,60,0.2); color: var(--danger); }
+  .badge-canceled{ background: rgba(242,237,228,0.1); color: var(--ink-dim); }
+  .activation-form{ margin-top:14px; padding-top:14px; border-top:1px solid var(--line); display:none; }
+  .activation-form.open{ display:grid; grid-template-columns: 1fr 1fr 1fr auto; gap:10px; align-items:end; }
+  .activation-form label{ margin-bottom:0; }
+  .empty-note{ color: var(--ink-dim); font-size:0.9rem; padding: 20px 0; }
+
+  /* ---------- TABELA ---------- */
+  .table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:8px; }
+  table{ width:100%; border-collapse:collapse; font-size:0.85rem; min-width:900px; }
+  th, td{ text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th{ color: var(--ink-dim); font-weight:500; background: rgba(0,0,0,0.18); }
+  tbody tr{ cursor:pointer; }
+  tbody tr:hover{ background: rgba(78,156,142,0.06); }
+
+  /* ---------- TIMELINE MODAL ---------- */
+  .modal-overlay{ position:fixed; inset:0; background:rgba(11,16,14,0.82); backdrop-filter: blur(4px); display:flex; align-items:center; justify-content:center; padding:20px; z-index:100; }
+  .modal-overlay[hidden]{ display:none; }
+  .modal-box{ background: var(--surface); border:1px solid var(--line); border-radius:8px; padding:28px; width:100%; max-width:480px; max-height:80vh; overflow-y:auto; }
+  .timeline-item{ display:flex; gap:12px; padding: 10px 0; border-bottom:1px solid var(--line); }
+  .timeline-item:last-child{ border-bottom:none; }
+  .timeline-item .evt{ font-size:0.9rem; }
+  .timeline-item .when{ font-size:0.75rem; color: var(--ink-dim); margin-top:2px; }
+
+  /* ---------- MENSAGENS ---------- */
+  .msg-editor{ margin-bottom:24px; }
+  .msg-editor textarea{ min-height:160px; font-family: monospace; font-size:0.82rem; }
+  .msg-hint{ font-size:0.78rem; color: var(--ink-dim); margin: 8px 0 12px; }
+  .msg-saved{ font-size:0.8rem; color: var(--teal-bright); margin-left:10px; }
+
+  [hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>Painel Aclive Store</h1>
+    <form id="loginForm">
+      <label>E-mail
+        <input type="email" id="loginEmail" required autocomplete="username">
+      </label>
+      <label>Senha
+        <input type="password" id="loginPass" required autocomplete="current-password">
+      </label>
+      <button type="submit" class="btn" style="width:100%;">Entrar</button>
+      <div class="login-error" id="loginError" hidden>E-mail ou senha incorretos.</div>
+    </form>
+  </div>
+</div>
+
+<div id="dashboard" hidden>
+  <header>
+    <div class="logo">Aclive Store <span>· painel</span></div>
+    <button class="btn-ghost btn-sm" id="logoutBtn">Sair</button>
+  </header>
+
+  <div class="wrap">
+    <div class="indicators" id="indicators"></div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="pendentes">Ativações pendentes</button>
+      <button class="tab-btn" data-tab="pedidos">Todos os pedidos</button>
+      <button class="tab-btn" data-tab="mensagens">Mensagens</button>
+    </div>
+
+    <div class="tab-panel active" id="tabPendentes">
+      <div id="pendingList"></div>
+    </div>
+
+    <div class="tab-panel" id="tabPedidos">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pedido</th><th>Nome</th><th>WhatsApp</th><th>Plano</th><th>Valor</th>
+              <th>Recursos</th><th>Status</th><th>Pago em</th><th>Ativado em</th><th>Vencimento</th><th>Usuário</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tabMensagens">
+      <div class="msg-editor">
+        <h3 style="font-size:1rem; margin-bottom:10px;">Mensagem — pedido recebido (antes do pagamento)</h3>
+        <p class="msg-hint">Placeholders: {NOME} {PLANO} {RECURSOS} {TELAS} {VALOR} {LINK_PAGAMENTO}</p>
+        <textarea id="msgPedidoInput"></textarea>
+        <button class="btn btn-sm" id="saveMsgPedidoBtn" style="margin-top:10px;">Salvar</button>
+        <span class="msg-saved" id="msgPedidoSaved" hidden>Salvo ✓</span>
+      </div>
+      <div class="msg-editor">
+        <h3 style="font-size:1rem; margin-bottom:10px;">Mensagem — credenciais (após ativação)</h3>
+        <p class="msg-hint">Placeholders: {NOME} {PLANO} {USUARIO} {SENHA} {DATA_ATIVACAO} {DATA_VENCIMENTO}</p>
+        <textarea id="msgCredenciaisInput"></textarea>
+        <button class="btn btn-sm" id="saveMsgCredenciaisBtn" style="margin-top:10px;">Salvar</button>
+        <span class="msg-saved" id="msgCredenciaisSaved" hidden>Salvo ✓</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="timelineModal" hidden>
+  <div class="modal-box">
+    <h3 id="timelineTitle" style="margin-bottom:16px;">Timeline do pedido</h3>
+    <div id="timelineList"></div>
+    <button class="btn-ghost btn-sm" id="timelineCloseBtn" style="margin-top:16px;">Fechar</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function(){
+  var SUPABASE_URL = 'https://lhtqvzhmpirpnkujalah.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxodHF2emhtcGlycG5rdWphbGFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNTgyMTcsImV4cCI6MjEwMzkzNDIxN30.x8itvIk4oCd6dUUjPpkdB84PK2aMowcXg9KLkmpQPSM';
+  var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  var loginScreen = document.getElementById('loginScreen');
+  var dashboard = document.getElementById('dashboard');
+  var loginForm = document.getElementById('loginForm');
+  var loginError = document.getElementById('loginError');
+  var logoutBtn = document.getElementById('logoutBtn');
+
+  var DEFAULT_MSG_PEDIDO = 'Olá, {NOME}! 👋\n\nRecebemos sua solicitação.\n\n📦 Plano: {PLANO}\n📺 Recursos: {RECURSOS}\n🖥️ Telas: {TELAS}\n💰 Valor: {VALOR}\n\nPara continuar, realize seu pagamento através do checkout seguro:\n{LINK_PAGAMENTO}\n\nApós a confirmação do pagamento, seu acesso será preparado.';
+  var DEFAULT_MSG_CREDENCIAIS = '🎉 Pagamento confirmado!\n\nOlá, {NOME}!\n\nSeu acesso foi criado com sucesso.\n\n📦 Plano: {PLANO}\n\n👤 Usuário:\n{USUARIO}\n\n🔑 Senha:\n{SENHA}\n\n📅 Ativação:\n{DATA_ATIVACAO}\n\n📅 Vencimento:\n{DATA_VENCIMENTO}\n\nObrigado por escolher a Aclive Store! ❤️';
+
+  function fmtMoney(n){ return 'R$ ' + Number(n || 0).toFixed(2).replace('.', ','); }
+  function fmtDate(iso){
+    if (!iso) return '—';
+    var d = new Date(iso);
+    return d.toLocaleDateString('pt-BR');
+  }
+
+  // ---------- LOGIN ----------
+  async function checkSession(){
+    var res = await supabase.auth.getSession();
+    if (res.data && res.data.session){
+      showDashboard();
+    } else {
+      loginScreen.hidden = false;
+      dashboard.hidden = true;
+    }
+  }
+
+  loginForm.addEventListener('submit', async function(e){
+    e.preventDefault();
+    loginError.hidden = true;
+    var email = document.getElementById('loginEmail').value.trim();
+    var pass = document.getElementById('loginPass').value;
+    var res = await supabase.auth.signInWithPassword({ email: email, password: pass });
+    if (res.error){
+      loginError.hidden = false;
+      return;
+    }
+    showDashboard();
+  });
+
+  logoutBtn.addEventListener('click', async function(){
+    await supabase.auth.signOut();
+    loginScreen.hidden = false;
+    dashboard.hidden = true;
+  });
+
+  function showDashboard(){
+    loginScreen.hidden = true;
+    dashboard.hidden = false;
+    loadAll();
+  }
+
+  // ---------- TABS ----------
+  document.querySelectorAll('.tab-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('tab' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1)).classList.add('active');
+    });
+  });
+
+  // ---------- CARREGAR PEDIDOS ----------
+  var allOrders = [];
+
+  async function loadAll(){
+    var res = await supabase.from('pedidos')
+      .select('*, cliente:clientes(nome, whatsapp, email)')
+      .order('created_at', { ascending: false });
+    allOrders = res.data || [];
+    renderIndicators();
+    renderPending();
+    renderOrdersTable();
+    loadMessages();
+  }
+
+  function statusBadge(pedido){
+    var s = pedido.status;
+    var label = s;
+    var cls = 'badge-pending';
+    if (s === 'PAGAMENTO_APROVADO'){ label = 'Aguardando ativação'; cls = 'badge-approved'; }
+    else if (s === 'AGUARDANDO_PAGAMENTO'){ label = 'Aguardando pagamento'; cls = 'badge-pending'; }
+    else if (s === 'ATIVO'){
+      if (pedido.expires_at){
+        var dias = Math.floor((new Date(pedido.expires_at) - new Date()) / 86400000);
+        if (dias < 0){ label = 'Vencido'; cls = 'badge-expired'; }
+        else if (dias <= 5){ label = 'Vence em ' + dias + 'd'; cls = 'badge-expiring'; }
+        else { label = 'Ativo'; cls = 'badge-active'; }
+      } else { label = 'Ativo'; cls = 'badge-active'; }
+    }
+    else if (s === 'CANCELADO' || s === 'REEMBOLSADO'){ label = s === 'CANCELADO' ? 'Cancelado' : 'Reembolsado'; cls = 'badge-canceled'; }
+    return '<span class="badge ' + cls + '">' + label + '</span>';
+  }
+
+  function renderIndicators(){
+    var hoje = new Date(); hoje.setHours(0,0,0,0);
+    var totalClientes = new Set(allOrders.map(function(o){ return o.cliente_id; })).size;
+    var pagosHoje = allOrders.filter(function(o){ return o.paid_at && new Date(o.paid_at) >= hoje; }).length;
+    var aprovados = allOrders.filter(function(o){ return ['PAGAMENTO_APROVADO','ATIVO'].indexOf(o.status) !== -1; }).length;
+    var aguardandoAtivacao = allOrders.filter(function(o){ return o.status === 'PAGAMENTO_APROVADO'; }).length;
+    var ativos = allOrders.filter(function(o){ return o.status === 'ATIVO'; }).length;
+    var proximos = allOrders.filter(function(o){
+      if (o.status !== 'ATIVO' || !o.expires_at) return false;
+      var dias = Math.floor((new Date(o.expires_at) - new Date()) / 86400000);
+      return dias >= 0 && dias <= 5;
+    }).length;
+    var vencidos = allOrders.filter(function(o){
+      return o.status === 'ATIVO' && o.expires_at && new Date(o.expires_at) < new Date();
+    }).length;
+    var faturamento = allOrders.filter(function(o){ return o.paid_at; }).reduce(function(sum, o){ return sum + Number(o.valor || 0); }, 0);
+
+    var items = [
+      ['Total de clientes', totalClientes],
+      ['Pagamentos hoje', pagosHoje],
+      ['Pagamentos aprovados', aprovados],
+      ['Aguardando ativação', aguardandoAtivacao],
+      ['Clientes ativos', ativos],
+      ['Próx. do vencimento', proximos],
+      ['Vencidos', vencidos],
+      ['Faturamento', fmtMoney(faturamento)]
+    ];
+    document.getElementById('indicators').innerHTML = items.map(function(it){
+      return '<div class="indicator"><div class="num">' + it[1] + '</div><div class="label">' + it[0] + '</div></div>';
+    }).join('');
+  }
+
+  function renderPending(){
+    var pending = allOrders.filter(function(o){ return o.status === 'PAGAMENTO_APROVADO'; });
+    var el = document.getElementById('pendingList');
+    if (pending.length === 0){
+      el.innerHTML = '<p class="empty-note">Nenhuma ativação pendente no momento.</p>';
+      return;
+    }
+    el.innerHTML = '';
+    pending.forEach(function(pedido){
+      var cliente = pedido.cliente || {};
+      var card = document.createElement('div');
+      card.className = 'pending-card';
+      card.innerHTML =
+        '<div class="row">' +
+          '<div>' +
+            '<div class="name">' + (cliente.nome || '—') + '</div>' +
+            '<div class="meta">Pedido ' + pedido.order_code + ' · Plano: ' + pedido.plan_label + ' · ' + fmtMoney(pedido.valor) + '</div>' +
+            '<div class="meta">WhatsApp: ' + (cliente.whatsapp || '—') + ' · Pago em: ' + fmtDate(pedido.paid_at) + '</div>' +
+          '</div>' +
+          '<div>' + statusBadge(pedido) + '</div>' +
+        '</div>' +
+        '<div class="row" style="margin-top:12px;">' +
+          '<button class="btn btn-sm" data-action="toggle-activation">Criar acesso</button>' +
+          '<button class="btn-ghost btn-sm" data-action="view-timeline">Ver timeline</button>' +
+        '</div>' +
+        '<div class="activation-form" data-form>' +
+          '<label>Usuário<input type="text" data-field="usuario"></label>' +
+          '<label>Senha<input type="text" data-field="senha"></label>' +
+          '<label>Data de ativação<input type="date" data-field="data" value="' + new Date().toISOString().slice(0,10) + '"></label>' +
+          '<button class="btn btn-sm" data-action="confirm-activation">Confirmar ativação</button>' +
+        '</div>';
+
+      card.querySelector('[data-action="toggle-activation"]').addEventListener('click', function(){
+        card.querySelector('[data-form]').classList.toggle('open');
+      });
+      card.querySelector('[data-action="view-timeline"]').addEventListener('click', function(){
+        openTimeline(pedido);
+      });
+      card.querySelector('[data-action="confirm-activation"]').addEventListener('click', function(){
+        confirmActivation(pedido, card);
+      });
+
+      el.appendChild(card);
+    });
+  }
+
+  async function confirmActivation(pedido, card){
+    var usuario = card.querySelector('[data-field="usuario"]').value.trim();
+    var senha = card.querySelector('[data-field="senha"]').value.trim();
+    var data = card.querySelector('[data-field="data"]').value;
+    if (!usuario || !senha || !data){
+      alert('Preencha usuário, senha e data de ativação.');
+      return;
+    }
+    var sessionRes = await supabase.auth.getSession();
+    var token = sessionRes.data && sessionRes.data.session && sessionRes.data.session.access_token;
+    if (!token){ alert('Sessão expirada, faça login de novo.'); return; }
+
+    var btn = card.querySelector('[data-action="confirm-activation"]');
+    btn.textContent = 'Confirmando...';
+    btn.disabled = true;
+
+    try{
+      var resp = await fetch('/api/confirmar-ativacao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ pedidoId: pedido.id, usuario: usuario, senha: senha, dataAtivacao: data })
+      });
+      var json = await resp.json();
+      if (!resp.ok){ throw new Error(json.error || 'Falha ao confirmar ativação'); }
+      await loadAll();
+    } catch(err){
+      alert(err.message);
+      btn.textContent = 'Confirmar ativação';
+      btn.disabled = false;
+    }
+  }
+
+  function renderOrdersTable(){
+    var tbody = document.getElementById('ordersTableBody');
+    tbody.innerHTML = '';
+    allOrders.forEach(function(pedido){
+      var cliente = pedido.cliente || {};
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + pedido.order_code + '</td>' +
+        '<td>' + (cliente.nome || '—') + '</td>' +
+        '<td>' + (cliente.whatsapp || '—') + '</td>' +
+        '<td>' + pedido.plan_label + '</td>' +
+        '<td>' + fmtMoney(pedido.valor) + '</td>' +
+        '<td>' + (Array.isArray(pedido.recursos) ? pedido.recursos.join(', ') : '—') + '</td>' +
+        '<td>' + statusBadge(pedido) + '</td>' +
+        '<td>' + fmtDate(pedido.paid_at) + '</td>' +
+        '<td>' + fmtDate(pedido.activated_at) + '</td>' +
+        '<td>' + fmtDate(pedido.expires_at) + '</td>' +
+        '<td>—</td>';
+      tr.addEventListener('click', function(){ openTimeline(pedido); });
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ---------- TIMELINE ----------
+  var timelineModal = document.getElementById('timelineModal');
+  var timelineList = document.getElementById('timelineList');
+  var timelineTitle = document.getElementById('timelineTitle');
+  document.getElementById('timelineCloseBtn').addEventListener('click', function(){ timelineModal.hidden = true; });
+  timelineModal.addEventListener('click', function(e){ if (e.target === timelineModal) timelineModal.hidden = true; });
+
+  async function openTimeline(pedido){
+    timelineTitle.textContent = 'Timeline — ' + pedido.order_code;
+    timelineList.innerHTML = '<p class="empty-note">Carregando...</p>';
+    timelineModal.hidden = false;
+    var res = await supabase.from('pedido_logs').select('*').eq('pedido_id', pedido.id).order('created_at', { ascending: true });
+    var logs = res.data || [];
+    if (logs.length === 0){
+      timelineList.innerHTML = '<p class="empty-note">Sem eventos registrados ainda.</p>';
+      return;
+    }
+    timelineList.innerHTML = logs.map(function(log){
+      var when = new Date(log.created_at).toLocaleString('pt-BR');
+      return '<div class="timeline-item"><div>✓</div><div><div class="evt">' + log.evento + '</div><div class="when">' + when + '</div></div></div>';
+    }).join('');
+  }
+
+  // ---------- MENSAGENS ----------
+  async function loadMessages(){
+    var pedidoRes = await supabase.from('site_content').select('value').eq('key', 'aclive_msg_pedido').maybeSingle();
+    var credRes = await supabase.from('site_content').select('value').eq('key', 'aclive_msg_credenciais').maybeSingle();
+    document.getElementById('msgPedidoInput').value = (pedidoRes.data && pedidoRes.data.value) || DEFAULT_MSG_PEDIDO;
+    document.getElementById('msgCredenciaisInput').value = (credRes.data && credRes.data.value) || DEFAULT_MSG_CREDENCIAIS;
+  }
+
+  function wireSaveMessage(btnId, inputId, key, savedId){
+    document.getElementById(btnId).addEventListener('click', async function(){
+      var value = document.getElementById(inputId).value;
+      await supabase.from('site_content').upsert({ key: key, value: value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      var saved = document.getElementById(savedId);
+      saved.hidden = false;
+      setTimeout(function(){ saved.hidden = true; }, 2500);
+    });
+  }
+  wireSaveMessage('saveMsgPedidoBtn', 'msgPedidoInput', 'aclive_msg_pedido', 'msgPedidoSaved');
+  wireSaveMessage('saveMsgCredenciaisBtn', 'msgCredenciaisInput', 'aclive_msg_credenciais', 'msgCredenciaisSaved');
+
+  checkSession();
+})();
+</script>
+</body>
+</html>
