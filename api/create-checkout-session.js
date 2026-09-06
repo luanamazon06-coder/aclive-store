@@ -29,7 +29,20 @@ module.exports = async function(req, res){
 
   try{
     var plan = await getPlan(supabaseAdmin, planId);
-    if (!plan){ res.status(400).json({ error: 'Plano inválido.' }); return; }
+    if (!plan){
+      // DIAGNÓSTICO TEMPORÁRIO — remover depois de identificar a causa.
+      var rawRes = await supabaseAdmin.from('site_content').select('*').eq('key', 'aclive_plans').maybeSingle();
+      res.status(400).json({
+        error: 'Plano inválido.',
+        debug: {
+          planIdRecebido: planId,
+          supabaseError: rawRes.error ? rawRes.error.message : null,
+          temDados: !!rawRes.data,
+          idsDisponiveis: rawRes.data && rawRes.data.value ? rawRes.data.value.map(function(p){ return p.id; }) : null
+        }
+      });
+      return;
+    }
 
     var permitidos = plan.recursos_disponiveis || [];
     var recursosValidos = permitidos.length
