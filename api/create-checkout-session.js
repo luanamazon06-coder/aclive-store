@@ -3,6 +3,7 @@ var { getAdminClient } = require('./_lib/supabaseAdmin');
 var { getPlan } = require('./_lib/plans');
 var { sendWhatsApp } = require('./_lib/whatsapp');
 var { getTemplate, fillTemplate, DEFAULT_MSG_PEDIDO } = require('./_lib/messages');
+var { getSupportWhatsapp } = require('./_lib/contact');
 
 module.exports = async function(req, res){
   if (req.method !== 'POST'){ res.status(405).json({ error: 'method not allowed' }); return; }
@@ -105,10 +106,11 @@ module.exports = async function(req, res){
 
     await sendWhatsApp(whatsapp, msg, pedido.id, supabaseAdmin);
 
+    var supportWhatsapp = await getSupportWhatsapp(supabaseAdmin);
     res.status(200).json({
       orderCode: pedido.order_code,
       checkoutUrl: checkoutUrl,
-      whatsappNumber: (process.env.SUPPORT_WHATSAPP || '5516996263295'),
+      whatsappNumber: supportWhatsapp,
       message: msg
     });
   } catch(err){
