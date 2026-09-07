@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aclive Store — Painel de vendas</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230E1512'/%3E%3Crect x='3' y='3' width='94' height='94' rx='19' fill='none' stroke='%232C6E63' stroke-width='2'/%3E%3Ctext x='50' y='71' font-family='Georgia, Cambria, serif' font-size='60' font-weight='600' fill='%23F0A85C' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230E1512'/%3E%3Crect x='3' y='3' width='94' height='94' rx='19' fill='none' stroke='%232C6E63' stroke-width='2'/%3E%3Ctext x='50' y='71' font-family='Georgia, Cambria, serif' font-size='60' font-weight='600' fill='%23F0A85C' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#0E1512">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -124,7 +127,10 @@
 <div id="dashboard" hidden>
   <header>
     <div class="logo">Aclive Store <span>· painel</span></div>
-    <button class="btn-ghost btn-sm" id="logoutBtn">Sair</button>
+    <div style="display:flex; gap:8px;">
+      <button class="btn-ghost btn-sm" id="pushBtn">🔔 Ativar notificações</button>
+      <button class="btn-ghost btn-sm" id="logoutBtn">Sair</button>
+    </div>
   </header>
 
   <div class="wrap">
@@ -530,6 +536,75 @@
   }
   wireSaveMessage('saveMsgPedidoBtn', 'msgPedidoInput', 'aclive_msg_pedido', 'msgPedidoSaved');
   wireSaveMessage('saveMsgCredenciaisBtn', 'msgCredenciaisInput', 'aclive_msg_credenciais', 'msgCredenciaisSaved');
+
+  // ---------- NOTIFICAÇÕES PUSH (sininho) ----------
+  var VAPID_PUBLIC_KEY = 'BLes6gJMru-Eli9qnH2F7KzqpxG1Hd_ROI3kjq3vPiaQaE844Sq_cbW7GvqgLTgHPj_e-6kuIj35rb-9LleNRV0';
+  var pushBtn = document.getElementById('pushBtn');
+
+  function urlBase64ToUint8Array(base64String){
+    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+    var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    var rawData = window.atob(base64);
+    var outputArray = new Uint8Array(rawData.length);
+    for (var i = 0; i < rawData.length; ++i){ outputArray[i] = rawData.charCodeAt(i); }
+    return outputArray;
+  }
+
+  async function refreshPushBtn(){
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)){
+      pushBtn.textContent = 'Notificações não suportadas neste navegador';
+      pushBtn.disabled = true;
+      return;
+    }
+    try{
+      var reg = await navigator.serviceWorker.getRegistration('/sw.js');
+      var sub = reg && await reg.pushManager.getSubscription();
+      pushBtn.textContent = sub ? '🔔 Notificações ativas ✓' : '🔔 Ativar notificações';
+    } catch(e){
+      pushBtn.textContent = '🔔 Ativar notificações';
+    }
+  }
+
+  async function enablePush(){
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)){
+      alert('Seu navegador não suporta notificações push.');
+      return;
+    }
+    pushBtn.disabled = true;
+    pushBtn.textContent = 'Ativando...';
+    try{
+      var permission = await Notification.requestPermission();
+      if (permission !== 'granted'){
+        alert('Permissão de notificação negada. Ative nas configurações do navegador pra usar essa função.');
+        return;
+      }
+      var reg = await navigator.serviceWorker.register('/sw.js');
+      var sub = await reg.pushManager.getSubscription();
+      if (!sub){
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+      }
+      var sessionRes = await supabase.auth.getSession();
+      var token = sessionRes.data && sessionRes.data.session && sessionRes.data.session.access_token;
+      var resp = await fetch('/api/save-push-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ subscription: sub.toJSON() })
+      });
+      if (!resp.ok){ throw new Error('Falha ao salvar inscrição no servidor.'); }
+      alert('Notificações ativadas! Você vai receber um aviso aqui sempre que um pagamento for aprovado.');
+    } catch(err){
+      alert('Não foi possível ativar as notificações: ' + err.message);
+    } finally{
+      pushBtn.disabled = false;
+      refreshPushBtn();
+    }
+  }
+
+  pushBtn.addEventListener('click', enablePush);
+  refreshPushBtn();
 
   checkSession();
 })();

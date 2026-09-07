@@ -1,6 +1,7 @@
 var Stripe = require('stripe');
 var { getAdminClient } = require('./_lib/supabaseAdmin');
 var { notifyAdminPaymentApproved } = require('./_lib/notify');
+var { notifyPushPaymentApproved } = require('./_lib/push');
 
 // Precisa do corpo cru (não parseado) pra validar a assinatura da Stripe.
 module.exports.config = { api: { bodyParser: false } };
@@ -55,10 +56,11 @@ module.exports = async function(req, res){
           ]);
           var clienteRes = await supabaseAdmin.from('clientes').select('*').eq('id', pedido.cliente_id).maybeSingle();
           var sent = await notifyAdminPaymentApproved(pedido, clienteRes.data);
-          await supabaseAdmin.from('pedido_logs').insert({
-            pedido_id: pedidoId,
-            evento: sent ? 'E-mail de aviso enviado ao admin' : 'E-mail de aviso não enviado (RESEND_API_KEY ausente ou falhou)'
-          });
+          var pushSent = await notifyPushPaymentApproved(pedido, clienteRes.data, supabaseAdmin);
+          await supabaseAdmin.from('pedido_logs').insert([
+            { pedido_id: pedidoId, evento: sent ? 'E-mail de aviso enviado ao admin' : 'E-mail de aviso não enviado (RESEND_API_KEY ausente ou falhou)' },
+            { pedido_id: pedidoId, evento: pushSent ? 'Notificação push enviada ao admin' : 'Notificação push não enviada (não configurada ou sem inscrições)' }
+          ]);
         }
       }
     } else if (event.type === 'checkout.session.expired'){
