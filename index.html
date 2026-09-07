@@ -976,7 +976,6 @@
     <button class="btn-primary" id="saveAllBtn" type="button">💾 Salvar alterações</button>
     <button class="btn-ghost" id="editPlansBtn" type="button">Editar preços</button>
     <button class="btn-ghost" id="editContactBtn" type="button">Editar WhatsApp</button>
-    <button class="btn-ghost" id="subscribersBtn" type="button">Assinantes</button>
     <button class="btn-ghost" id="pageBgBtn" type="button">Fundo da página</button>
     <button class="btn-ghost" id="trialLinkBtn" type="button">Link de teste grátis</button>
     <button class="btn-ghost" id="diagBtn" type="button">Diagnóstico</button>
@@ -1846,7 +1845,7 @@
   }
   renderSubscribers();
 
-  subscribersBtnEl.addEventListener('click', function(){ subsModal.hidden = false; });
+  if (subscribersBtnEl) subscribersBtnEl.addEventListener('click', function(){ subsModal.hidden = false; });
   subsCloseBtn.addEventListener('click', function(){ subsModal.hidden = true; });
   subsModal.addEventListener('click', function(e){ if(e.target === subsModal) subsModal.hidden = true; });
 
