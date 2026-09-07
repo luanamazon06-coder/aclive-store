@@ -115,6 +115,6 @@ module.exports = async function(req, res){
     });
   } catch(err){
     console.error('create-checkout-session error', err);
-    res.status(500).json({ error: 'Não foi possível gerar o pagamento. Tente novamente em instantes.', debugTemp: String((err && err.message) || err) });
+    res.status(500).json({ error: 'Não foi possível gerar o pagamento. Tente novamente em instantes.' });
   }
 };
