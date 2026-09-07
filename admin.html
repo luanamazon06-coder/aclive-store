@@ -222,6 +222,7 @@
     var pass = document.getElementById('loginPass').value;
     var res = await supabase.auth.signInWithPassword({ email: email, password: pass });
     if (res.error){
+      loginError.textContent = res.error.message || 'E-mail ou senha incorretos.';
       loginError.hidden = false;
       return;
     }
@@ -257,7 +258,13 @@
     var res = await supabase.from('pedidos')
       .select('*, cliente:clientes(nome, whatsapp, email)')
       .order('created_at', { ascending: false });
-    allOrders = res.data || [];
+    if (res.error){
+      document.getElementById('pendingList').innerHTML =
+        '<p class="empty-note" style="color:var(--danger);">Erro ao carregar pedidos: ' + res.error.message + '</p>';
+      allOrders = [];
+    } else {
+      allOrders = res.data || [];
+    }
     renderIndicators();
     renderPending();
     renderOrdersTable();
