@@ -2656,6 +2656,34 @@
     });
   });
 
+  // Se voltar do checkout da Stripe (?pedido=ACL-000123&status=sucesso|cancelado), mostra a
+  // confirmação na hora em vez de simplesmente cair na home sem explicação nenhuma.
+  (function checkPaymentReturn(){
+    var params = new URLSearchParams(window.location.search);
+    var pedidoCode = params.get('pedido');
+    var status = params.get('status');
+    if (!pedidoCode || !status) return;
+
+    orderModalTitle.textContent = status === 'sucesso' ? 'Pagamento confirmado!' : 'Pagamento não concluído';
+    orderPayBtn.hidden = true;
+    orderWhatsappBtn.className = 'btn-primary';
+    var waMsg;
+    if (status === 'sucesso'){
+      orderSuccessText.textContent = 'Recebemos seu pagamento do pedido ' + pedidoCode + '! Em breve seu acesso será liberado e enviaremos os dados de login por aqui.';
+      waMsg = 'Olá! Fiz o pagamento do pedido ' + pedidoCode + ' e queria confirmar o recebimento.';
+    } else {
+      orderSuccessText.textContent = 'O pagamento do pedido ' + pedidoCode + ' não foi concluído. Se quiser tentar de novo ou precisar de ajuda, é só chamar por aqui.';
+      waMsg = 'Olá! Meu pagamento do pedido ' + pedidoCode + ' não foi concluído, pode me ajudar?';
+    }
+    orderWhatsappBtn.href = 'https://wa.me/' + SUPPORT_WHATSAPP + '?text=' + encodeURIComponent(waMsg);
+    orderFormStep.hidden = true;
+    orderSuccessStep.hidden = false;
+    orderModal.hidden = false;
+
+    var cleanUrl = window.location.pathname + window.location.hash;
+    window.history.replaceState({}, document.title, cleanUrl);
+  })();
+
   // ---------- SALVAR ALTERAÇÕES (botão explícito) ----------
   // Todo edit já salva sozinho na hora. Esse botão força regravar tudo de uma vez e dá uma
   // confirmação clara e visível — útil pra ter certeza de que nada ficou pendente.
