@@ -933,7 +933,7 @@
 
       <div class="pay-card">
         <h3>Cartão de crédito</h3>
-        <p>Pagamento processado via Asaas — escolha o plano e você será levado ao checkout certo.</p>
+        <p>Escolha o plano — você vai preencher seus dados e ser levado ao checkout seguro.</p>
         <label class="pix-select-label" for="cardPlanSelect">Plano</label>
         <select id="cardPlanSelect" class="pix-select">
           <option id="cardOptMensal1" value="https://www.asaas.com/c/tg1qkd8m9okrzhti">Mensal — 1º mês (R$ 40)</option>
@@ -953,7 +953,7 @@
         </div>
 
         <div id="cardActionArea">
-          <a href="https://www.asaas.com/c/tg1qkd8m9okrzhti" target="_blank" rel="noopener" class="card-btn" id="asaasLink">Ir para pagamento</a>
+          <button type="button" class="card-btn" id="asaasLink">Ir para pagamento</button>
           <div class="qr-label" style="margin-top:16px;">Parcelamento e juros conforme condições exibidas pelo Asaas no checkout.</div>
         </div>
       </div>
@@ -2201,11 +2201,15 @@
     }
   });
 
-  // ---------- CARTÃO DE CRÉDITO (Asaas) ----------
+  // ---------- CARTÃO DE CRÉDITO ----------
+  // Abre o mesmo cadastro (nome/WhatsApp/e-mail) usado pelos botões "Assinar" dos planos, em vez
+  // de ir direto pro checkout — assim todo pagamento por cartão também vira pedido rastreado no painel.
   var cardPlanSelect = document.getElementById('cardPlanSelect');
   var asaasLink = document.getElementById('asaasLink');
-  cardPlanSelect.addEventListener('change', function(){
-    asaasLink.href = cardPlanSelect.value;
+  asaasLink.addEventListener('click', function(){
+    var selected = cardPlanSelect.selectedOptions[0];
+    var plan = selected && findPlan(selected.dataset.planId);
+    if (plan) openOrderModal(plan);
   });
 
   // ---------- VERIFICAÇÃO DE RENOVAÇÃO MENSAL ----------
@@ -2416,7 +2420,6 @@
       cardOpt.textContent = p.label + ' (R$ ' + fmtPrice(p.price) + ')';
       cardPlanSelect.appendChild(cardOpt);
     });
-    if (typeof asaasLink !== 'undefined') asaasLink.href = cardPlanSelect.value;
     if (typeof qrPlanSelect.dispatchEvent === 'function'){
       qrPlanSelect.dispatchEvent(new Event('change'));
       cardPlanSelect.dispatchEvent(new Event('change'));
