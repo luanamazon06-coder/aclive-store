@@ -152,7 +152,7 @@
           <thead>
             <tr>
               <th>Pedido</th><th>Nome</th><th>WhatsApp</th><th>Plano</th><th>Valor</th>
-              <th>Recursos</th><th>Status</th><th>Pago em</th><th>Ativado em</th><th>Vencimento</th><th>Usuário</th>
+              <th>Recursos</th><th>Status</th><th>Pago em</th><th>Ativado em</th><th>Vencimento</th><th>Usuário</th><th></th>
             </tr>
           </thead>
           <tbody id="ordersTableBody"></tbody>
@@ -327,91 +327,154 @@
     }).join('');
   }
 
-  function renderPending(){
-    var awaitingPayment = allOrders.filter(function(o){ return o.status === 'AGUARDANDO_PAGAMENTO'; });
-    var approved = allOrders.filter(function(o){ return o.status === 'PAGAMENTO_APROVADO'; });
-    var el = document.getElementById('pendingList');
-    el.innerHTML = '';
+  var currentPendingFilter = 'todos';
 
-    if (awaitingPayment.length > 0){
-      var h1 = document.createElement('h3');
-      h1.style.cssText = 'font-size:0.95rem; color:var(--ink-dim); margin: 4px 0 10px;';
-      h1.textContent = 'Aguardando confirmação de pagamento (combinado no WhatsApp) — ' + awaitingPayment.length;
-      el.appendChild(h1);
-      awaitingPayment.forEach(function(pedido){ el.appendChild(renderAwaitingPaymentCard(pedido)); });
-    }
-
-    var h2 = document.createElement('h3');
-    h2.style.cssText = 'font-size:0.95rem; color:var(--ink-dim); margin: 20px 0 10px;';
-    h2.textContent = 'Aguardando ativação — ' + approved.length;
-    el.appendChild(h2);
-
-    if (approved.length === 0){
-      var empty = document.createElement('p');
-      empty.className = 'empty-note';
-      empty.textContent = 'Nenhuma ativação pendente no momento.';
-      el.appendChild(empty);
-      return;
-    }
-    approved.forEach(function(pedido){
-      var cliente = pedido.cliente || {};
-      var card = document.createElement('div');
-      card.className = 'pending-card';
-      card.innerHTML =
-        '<div class="row">' +
-          '<div>' +
-            '<div class="name">' + (cliente.nome || '—') + '</div>' +
-            '<div class="meta">Pedido ' + pedido.order_code + ' · Plano: ' + pedido.plan_label + ' · ' + fmtMoney(pedido.valor) + '</div>' +
-            '<div class="meta">WhatsApp: ' + (cliente.whatsapp || '—') + ' · Pago em: ' + fmtDate(pedido.paid_at) + '</div>' +
-          '</div>' +
-          '<div>' + statusBadge(pedido) + '</div>' +
-        '</div>' +
-        '<div class="row" style="margin-top:12px;">' +
-          '<button class="btn btn-sm" data-action="toggle-activation">Criar acesso</button>' +
-          '<button class="btn-ghost btn-sm" data-action="view-timeline">Ver timeline</button>' +
-        '</div>' +
-        '<div class="activation-form" data-form>' +
-          '<label>Usuário<input type="text" data-field="usuario"></label>' +
-          '<label>Senha<input type="text" data-field="senha"></label>' +
-          '<label>Data de ativação<input type="date" data-field="data" value="' + new Date().toISOString().slice(0,10) + '"></label>' +
-          '<button class="btn btn-sm" data-action="confirm-activation">Confirmar ativação</button>' +
-        '</div>';
-
-      card.querySelector('[data-action="toggle-activation"]').addEventListener('click', function(){
-        card.querySelector('[data-form]').classList.toggle('open');
-      });
-      card.querySelector('[data-action="view-timeline"]').addEventListener('click', function(){
-        openTimeline(pedido);
-      });
-      card.querySelector('[data-action="confirm-activation"]').addEventListener('click', function(){
-        confirmActivation(pedido, card);
-      });
-
-      el.appendChild(card);
-    });
+  function isVencendo(pedido){
+    if (pedido.status !== 'ATIVO' || !pedido.expires_at) return false;
+    var dias = Math.floor((new Date(pedido.expires_at) - new Date()) / 86400000);
+    return dias >= 0 && dias <= 5;
+  }
+  function isVencido(pedido){
+    return pedido.status === 'ATIVO' && pedido.expires_at && new Date(pedido.expires_at) < new Date();
+  }
+  function statusMatchesFilter(pedido, filter){
+    if (filter === 'aguardando_pagamento') return pedido.status === 'AGUARDANDO_PAGAMENTO';
+    if (filter === 'aguardando_ativacao') return pedido.status === 'PAGAMENTO_APROVADO';
+    if (filter === 'ativos') return pedido.status === 'ATIVO' && !isVencendo(pedido) && !isVencido(pedido);
+    if (filter === 'vencendo') return isVencendo(pedido);
+    if (filter === 'vencidos') return isVencido(pedido);
+    if (filter === 'cancelados') return pedido.status === 'CANCELADO' || pedido.status === 'REEMBOLSADO';
+    return true;
   }
 
-  function renderAwaitingPaymentCard(pedido){
+  function buildOrderCard(pedido){
     var cliente = pedido.cliente || {};
     var card = document.createElement('div');
     card.className = 'pending-card';
+
+    var actionsHtml = '';
+    if (pedido.status === 'AGUARDANDO_PAGAMENTO'){
+      actionsHtml += '<button class="btn btn-sm" data-action="mark-paid">Marcar como pago</button>';
+    }
+    if (pedido.status === 'PAGAMENTO_APROVADO'){
+      actionsHtml += '<button class="btn btn-sm" data-action="toggle-activation">Criar acesso</button>';
+    }
+    if (cliente.whatsapp){
+      actionsHtml += '<a class="btn-ghost btn-sm" style="text-decoration:none; display:inline-flex; align-items:center;" target="_blank" rel="noopener" href="https://wa.me/' + String(cliente.whatsapp).replace(/[^0-9]/g, '') + '">Chamar no WhatsApp</a>';
+    }
+    actionsHtml += '<button class="btn-ghost btn-sm" data-action="view-timeline">Ver timeline</button>';
+    actionsHtml += '<button class="btn-ghost btn-sm" data-action="delete" style="border-color:var(--danger); color:var(--danger);">Excluir</button>';
+
+    var metaBits = ['WhatsApp: ' + (cliente.whatsapp || '—')];
+    if (pedido.status === 'AGUARDANDO_PAGAMENTO'){
+      metaBits.push('Recursos: ' + (Array.isArray(pedido.recursos) ? pedido.recursos.join(', ') : '—'));
+    } else {
+      if (pedido.paid_at) metaBits.push('Pago em: ' + fmtDate(pedido.paid_at));
+      if (pedido.expires_at) metaBits.push('Vence em: ' + fmtDate(pedido.expires_at));
+    }
+
     card.innerHTML =
       '<div class="row">' +
         '<div>' +
           '<div class="name">' + (cliente.nome || '—') + '</div>' +
           '<div class="meta">Pedido ' + pedido.order_code + ' · Plano: ' + pedido.plan_label + ' · ' + fmtMoney(pedido.valor) + '</div>' +
-          '<div class="meta">WhatsApp: ' + (cliente.whatsapp || '—') + ' · Recursos: ' + (Array.isArray(pedido.recursos) ? pedido.recursos.join(', ') : '—') + '</div>' +
+          '<div class="meta">' + metaBits.join(' · ') + '</div>' +
         '</div>' +
         '<div>' + statusBadge(pedido) + '</div>' +
       '</div>' +
-      '<div class="row" style="margin-top:12px;">' +
-        '<button class="btn btn-sm" data-action="mark-paid">Marcar como pago</button>' +
-        '<a class="btn-ghost btn-sm" style="text-decoration:none; display:inline-flex; align-items:center;" target="_blank" rel="noopener" href="https://wa.me/' + (cliente.whatsapp || '').replace(/[^0-9]/g, '') + '">Chamar no WhatsApp</a>' +
-        '<button class="btn-ghost btn-sm" data-action="view-timeline">Ver timeline</button>' +
-      '</div>';
-    card.querySelector('[data-action="mark-paid"]').addEventListener('click', function(){ markAsPaidManually(pedido, card); });
+      '<div class="row" style="margin-top:12px;">' + actionsHtml + '</div>' +
+      (pedido.status === 'PAGAMENTO_APROVADO' ?
+        '<div class="activation-form" data-form>' +
+          '<label>Usuário<input type="text" data-field="usuario"></label>' +
+          '<label>Senha<input type="text" data-field="senha"></label>' +
+          '<label>Data de ativação<input type="date" data-field="data" value="' + new Date().toISOString().slice(0,10) + '"></label>' +
+          '<button class="btn btn-sm" data-action="confirm-activation">Confirmar ativação</button>' +
+        '</div>' : '');
+
+    var toggleBtn = card.querySelector('[data-action="toggle-activation"]');
+    if (toggleBtn) toggleBtn.addEventListener('click', function(){ card.querySelector('[data-form]').classList.toggle('open'); });
+    var confirmBtn = card.querySelector('[data-action="confirm-activation"]');
+    if (confirmBtn) confirmBtn.addEventListener('click', function(){ confirmActivation(pedido, card); });
+    var markPaidBtn = card.querySelector('[data-action="mark-paid"]');
+    if (markPaidBtn) markPaidBtn.addEventListener('click', function(){ markAsPaidManually(pedido, card); });
     card.querySelector('[data-action="view-timeline"]').addEventListener('click', function(){ openTimeline(pedido); });
+    card.querySelector('[data-action="delete"]').addEventListener('click', function(){ deletePedido(pedido); });
+
     return card;
+  }
+
+  async function deletePedido(pedido){
+    var cliente = pedido.cliente || {};
+    if (!confirm('Excluir o pedido ' + pedido.order_code + ' (' + (cliente.nome || '—') + ')? Essa ação não pode ser desfeita.')) return;
+    await supabase.from('acessos').delete().eq('pedido_id', pedido.id);
+    await supabase.from('pedido_logs').delete().eq('pedido_id', pedido.id);
+    var res = await supabase.from('pedidos').delete().eq('id', pedido.id);
+    if (res.error){
+      alert('Não foi possível excluir: ' + res.error.message);
+      return;
+    }
+    await loadAll();
+  }
+
+  function renderPending(){
+    var el = document.getElementById('pendingList');
+    el.innerHTML = '';
+
+    var filterBar = document.createElement('div');
+    filterBar.style.cssText = 'margin-bottom:18px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;';
+    filterBar.innerHTML =
+      '<label style="margin:0; font-size:0.85rem; color:var(--ink-dim); white-space:nowrap;">Filtrar:</label>' +
+      '<select id="pendingFilterSelect" style="width:auto; min-width:260px;">' +
+        '<option value="todos">Visão padrão (aguardando pagamento + ativação)</option>' +
+        '<option value="aguardando_pagamento">Cadastrados — aguardando pagamento</option>' +
+        '<option value="aguardando_ativacao">Pagos — aguardando ativação</option>' +
+        '<option value="ativos">Pagos — ativos</option>' +
+        '<option value="vencendo">Prestes a expirar (≤5 dias)</option>' +
+        '<option value="vencidos">Vencidos</option>' +
+        '<option value="cancelados">Cancelados / reembolsados</option>' +
+      '</select>';
+    el.appendChild(filterBar);
+    var select = filterBar.querySelector('#pendingFilterSelect');
+    select.value = currentPendingFilter;
+    select.addEventListener('change', function(){ currentPendingFilter = select.value; renderPending(); });
+
+    if (currentPendingFilter === 'todos'){
+      var awaitingPayment = allOrders.filter(function(o){ return o.status === 'AGUARDANDO_PAGAMENTO'; });
+      var approved = allOrders.filter(function(o){ return o.status === 'PAGAMENTO_APROVADO'; });
+
+      if (awaitingPayment.length > 0){
+        var h1 = document.createElement('h3');
+        h1.style.cssText = 'font-size:0.95rem; color:var(--ink-dim); margin: 4px 0 10px;';
+        h1.textContent = 'Aguardando confirmação de pagamento (combinado no WhatsApp) — ' + awaitingPayment.length;
+        el.appendChild(h1);
+        awaitingPayment.forEach(function(pedido){ el.appendChild(buildOrderCard(pedido)); });
+      }
+
+      var h2 = document.createElement('h3');
+      h2.style.cssText = 'font-size:0.95rem; color:var(--ink-dim); margin: 20px 0 10px;';
+      h2.textContent = 'Aguardando ativação — ' + approved.length;
+      el.appendChild(h2);
+
+      if (approved.length === 0){
+        var empty = document.createElement('p');
+        empty.className = 'empty-note';
+        empty.textContent = 'Nenhuma ativação pendente no momento.';
+        el.appendChild(empty);
+      } else {
+        approved.forEach(function(pedido){ el.appendChild(buildOrderCard(pedido)); });
+      }
+      return;
+    }
+
+    var filtered = allOrders.filter(function(o){ return statusMatchesFilter(o, currentPendingFilter); });
+    if (filtered.length === 0){
+      var empty2 = document.createElement('p');
+      empty2.className = 'empty-note';
+      empty2.textContent = 'Nenhum pedido nesse filtro.';
+      el.appendChild(empty2);
+    } else {
+      filtered.forEach(function(pedido){ el.appendChild(buildOrderCard(pedido)); });
+    }
   }
 
   async function markAsPaidManually(pedido, card){
@@ -488,8 +551,13 @@
         '<td>' + fmtDate(pedido.paid_at) + '</td>' +
         '<td>' + fmtDate(pedido.activated_at) + '</td>' +
         '<td>' + fmtDate(pedido.expires_at) + '</td>' +
-        '<td>—</td>';
+        '<td>—</td>' +
+        '<td><button class="btn-ghost btn-sm" data-action="delete" style="border-color:var(--danger); color:var(--danger);">Excluir</button></td>';
       tr.addEventListener('click', function(){ openTimeline(pedido); });
+      tr.querySelector('[data-action="delete"]').addEventListener('click', function(e){
+        e.stopPropagation();
+        deletePedido(pedido);
+      });
       tbody.appendChild(tr);
     });
   }
