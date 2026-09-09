@@ -365,9 +365,9 @@
     actionsHtml += '<button class="btn-ghost btn-sm" data-action="view-timeline">Ver timeline</button>';
     actionsHtml += '<button class="btn-ghost btn-sm" data-action="delete" style="border-color:var(--danger); color:var(--danger);">Excluir</button>';
 
-    var metaBits = ['WhatsApp: ' + (cliente.whatsapp || '—')];
+    var metaBits = ['WhatsApp: ' + escapeHtml(cliente.whatsapp || '—')];
     if (pedido.status === 'AGUARDANDO_PAGAMENTO'){
-      metaBits.push('Recursos: ' + (Array.isArray(pedido.recursos) ? pedido.recursos.join(', ') : '—'));
+      metaBits.push('Recursos: ' + escapeHtml(Array.isArray(pedido.recursos) ? pedido.recursos.join(', ') : '—'));
     } else {
       if (pedido.paid_at) metaBits.push('Pago em: ' + fmtDate(pedido.paid_at));
       if (pedido.expires_at) metaBits.push('Vence em: ' + fmtDate(pedido.expires_at));
@@ -376,8 +376,8 @@
     card.innerHTML =
       '<div class="row">' +
         '<div>' +
-          '<div class="name">' + (cliente.nome || '—') + '</div>' +
-          '<div class="meta">Pedido ' + pedido.order_code + ' · Plano: ' + pedido.plan_label + ' · ' + fmtMoney(pedido.valor) + '</div>' +
+          '<div class="name">' + escapeHtml(cliente.nome || '—') + '</div>' +
+          '<div class="meta">Pedido ' + escapeHtml(pedido.order_code) + ' · Plano: ' + escapeHtml(pedido.plan_label) + ' · ' + fmtMoney(pedido.valor) + '</div>' +
           '<div class="meta">' + metaBits.join(' · ') + '</div>' +
         '</div>' +
         '<div>' + statusBadge(pedido) + '</div>' +
@@ -541,12 +541,12 @@
       var cliente = pedido.cliente || {};
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td>' + pedido.order_code + '</td>' +
-        '<td>' + (cliente.nome || '—') + '</td>' +
-        '<td>' + (cliente.whatsapp || '—') + '</td>' +
-        '<td>' + pedido.plan_label + '</td>' +
+        '<td>' + escapeHtml(pedido.order_code) + '</td>' +
+        '<td>' + escapeHtml(cliente.nome || '—') + '</td>' +
+        '<td>' + escapeHtml(cliente.whatsapp || '—') + '</td>' +
+        '<td>' + escapeHtml(pedido.plan_label) + '</td>' +
         '<td>' + fmtMoney(pedido.valor) + '</td>' +
-        '<td>' + (Array.isArray(pedido.recursos) ? pedido.recursos.join(', ') : '—') + '</td>' +
+        '<td>' + escapeHtml(Array.isArray(pedido.recursos) ? pedido.recursos.join(', ') : '—') + '</td>' +
         '<td>' + statusBadge(pedido) + '</td>' +
         '<td>' + fmtDate(pedido.paid_at) + '</td>' +
         '<td>' + fmtDate(pedido.activated_at) + '</td>' +
@@ -569,6 +569,12 @@
   document.getElementById('timelineCloseBtn').addEventListener('click', function(){ timelineModal.hidden = true; });
   timelineModal.addEventListener('click', function(e){ if (e.target === timelineModal) timelineModal.hidden = true; });
 
+  function escapeHtml(s){
+    return String(s || '').replace(/[&<>"']/g, function(c){
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
   async function openTimeline(pedido){
     timelineTitle.textContent = 'Timeline — ' + pedido.order_code;
     timelineList.innerHTML = '<p class="empty-note">Carregando...</p>';
@@ -579,10 +585,35 @@
       timelineList.innerHTML = '<p class="empty-note">Sem eventos registrados ainda.</p>';
       return;
     }
-    timelineList.innerHTML = logs.map(function(log){
+    var cliente = pedido.cliente || {};
+    var waDigits = String(cliente.whatsapp || '').replace(/[^0-9]/g, '');
+
+    timelineList.innerHTML = logs.map(function(log, i){
       var when = new Date(log.created_at).toLocaleString('pt-BR');
-      return '<div class="timeline-item"><div>✓</div><div><div class="evt">' + log.evento + '</div><div class="when">' + when + '</div></div></div>';
+      var extra = '';
+      if (log.detalhe){
+        extra =
+          '<div class="timeline-detail" data-detail="' + i + '" style="margin-top:8px; padding:10px; background:var(--surface-2); border-radius:4px; font-size:0.8rem; white-space:pre-wrap;">' +
+            escapeHtml(log.detalhe) +
+          '</div>' +
+          '<div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">' +
+            '<button class="btn-ghost btn-sm" data-copy="' + i + '">Copiar mensagem</button>' +
+            (waDigits ? '<a class="btn btn-sm" style="text-decoration:none;" target="_blank" rel="noopener" href="https://wa.me/' + waDigits + '?text=' + encodeURIComponent(log.detalhe) + '">Abrir no WhatsApp com essa mensagem</a>' : '') +
+          '</div>';
+      }
+      return '<div class="timeline-item"><div>✓</div><div style="flex:1;"><div class="evt">' + escapeHtml(log.evento) + '</div><div class="when">' + when + '</div>' + extra + '</div></div>';
     }).join('');
+
+    timelineList.querySelectorAll('[data-copy]').forEach(function(btn){
+      var idx = btn.dataset.copy;
+      btn.addEventListener('click', function(){
+        var text = logs[idx].detalhe || '';
+        navigator.clipboard.writeText(text).then(function(){
+          btn.textContent = 'Copiado ✓';
+          setTimeout(function(){ btn.textContent = 'Copiar mensagem'; }, 1500);
+        });
+      });
+    });
   }
 
   // ---------- MENSAGENS ----------
