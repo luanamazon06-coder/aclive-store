@@ -296,6 +296,54 @@
     .gallery-item, .gallery-add{ flex-basis: 130px !important; height: 170px !important; }
   }
 
+  .videos-section[hidden]{ display:none; }
+  .video-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 22px;
+  }
+  .video-card{
+    position:relative;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow:hidden;
+    background: var(--surface);
+    transition: transform .3s cubic-bezier(.2,.8,.3,1.3), border-color .25s ease;
+  }
+  .video-card:hover{
+    transform: translateY(-6px);
+    border-color: var(--amber-bright);
+  }
+  .video-card video{
+    display:block;
+    width:100%;
+    aspect-ratio: 16 / 9;
+    background:#000;
+  }
+  .video-delete{
+    position:absolute; top:8px; right:8px; z-index:3;
+    width:24px; height:24px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid var(--line); color: var(--ink);
+    font-size: 0.9rem; line-height:1; cursor:pointer;
+    display:none; align-items:center; justify-content:center;
+  }
+  body.is-admin .video-delete{ display:flex; }
+  .video-delete:hover{ border-color:#E0693C; color:#E0693C; }
+  .video-add{
+    min-height: 168px;
+    aspect-ratio: 16 / 9;
+    border-radius: 10px;
+    border: 1px dashed var(--line);
+    background: transparent;
+    color: var(--ink-dim);
+    font-size: 0.95rem;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .video-add[hidden]{ display:none; }
+  .video-add:hover{ border-color: var(--amber-bright); color: var(--amber-bright); }
+
 
   @media (max-width: 620px){
     .hero{ padding: 24px 0; }
@@ -818,6 +866,7 @@
     <div class="logo">Aclive Store</div>
     <div class="nav-links">
       <a href="#portfolio">Portfólio</a>
+      <a href="#videos">Vídeos</a>
       <a href="#planos">Planos</a>
       <a href="#pagamento">Pagamento</a>
     </div>
@@ -906,6 +955,19 @@
   <input type="file" id="genreInput" accept="image/*" hidden>
   <input type="file" id="editImageInput" accept="image/*" hidden>
 </section>
+
+<section id="videos" class="videos-section" hidden>
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Vídeos</h2>
+      <p>Prévias, bastidores e novidades em vídeo.</p>
+    </div>
+    <div class="video-grid" id="videoGrid">
+      <button class="video-add" id="addVideoBtn" type="button" hidden>+ Adicionar vídeo</button>
+    </div>
+  </div>
+</section>
+<input type="file" id="videoInput" accept="video/*" hidden>
 
 <section class="plans-section" id="planos">
   <div class="wrap">
@@ -1223,6 +1285,7 @@
   var pageBgImage = document.getElementById('pageBgImage');
   var manageSlidesBtn = document.getElementById('manageSlidesBtn');
   var addGalleryBtn = document.getElementById('addGalleryBtn');
+  var addVideoBtn = document.getElementById('addVideoBtn');
   var addCategoryBtn = document.getElementById('addCategoryBtn');
   var addCellBtn = document.getElementById('addCellBtn');
   var genreInput = document.getElementById('genreInput');
@@ -1251,6 +1314,8 @@
     manageSlidesBtn.hidden = false;
     addGalleryBtn.hidden = false;
     document.getElementById('gallerySection').hidden = false;
+    addVideoBtn.hidden = false;
+    document.getElementById('videos').hidden = false;
     addCategoryBtn.hidden = false;
     addCellBtn.hidden = false;
     refreshCatalogEditableState();
@@ -1262,6 +1327,8 @@
     manageSlidesBtn.hidden = true;
     addGalleryBtn.hidden = true;
     if (galleryItems.length === 0) document.getElementById('gallerySection').hidden = true;
+    addVideoBtn.hidden = true;
+    if (videoItems.length === 0) document.getElementById('videos').hidden = true;
     addCategoryBtn.hidden = true;
     addCellBtn.hidden = true;
     refreshCatalogEditableState();
@@ -1348,6 +1415,17 @@
       .then(function(res){
         if (res.error) throw res.error;
         var pub = supabaseClient.storage.from('site-images').getPublicUrl(path);
+        return pub.data.publicUrl;
+      });
+  }
+  function uploadVideoBlob(file){
+    if (!supabaseClient) return Promise.reject(new Error('Supabase indisponível'));
+    var ext = (file.name && /\.\w+$/.test(file.name)) ? file.name.split('.').pop() : 'mp4';
+    var path = 'vid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+    return supabaseClient.storage.from('site-videos').upload(path, file, { contentType: file.type || 'video/mp4', upsert: true })
+      .then(function(res){
+        if (res.error) throw res.error;
+        var pub = supabaseClient.storage.from('site-videos').getPublicUrl(path);
         return pub.data.publicUrl;
       });
   }
@@ -1637,6 +1715,75 @@
         galleryInput.value = '';
         galleryEditingId = null;
       });
+    });
+  });
+
+  // ---------- VÍDEOS ----------
+  var videosSection = document.getElementById('videos');
+  var videoGrid = document.getElementById('videoGrid');
+  var videoInput = document.getElementById('videoInput');
+  var videoItems = [];
+  var MAX_VIDEO_MB = 100;
+
+  function saveVideos(){ return reportSave(scSet('aclive_videos', videoItems), 'Vídeos'); }
+
+  function renderVideos(){
+    videoGrid.querySelectorAll('.video-card').forEach(function(el){ el.remove(); });
+    videoItems.forEach(function(item){
+      var card = document.createElement('div');
+      card.className = 'video-card';
+      card.dataset.id = item.id;
+
+      var vid = document.createElement('video');
+      vid.src = item.url;
+      vid.controls = true;
+      vid.preload = 'metadata';
+      card.appendChild(vid);
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'video-delete';
+      delBtn.type = 'button';
+      delBtn.setAttribute('aria-label', 'Remover');
+      delBtn.textContent = '×';
+      delBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        videoItems = videoItems.filter(function(v){ return v.id !== item.id; });
+        saveVideos();
+        renderVideos();
+        if (videoItems.length === 0 && !document.body.classList.contains('is-admin')){
+          videosSection.hidden = true;
+        }
+      });
+      card.appendChild(delBtn);
+
+      videoGrid.insertBefore(card, addVideoBtn);
+    });
+    videosSection.hidden = videoItems.length === 0 && !document.body.classList.contains('is-admin');
+  }
+  renderVideos();
+  scGet('aclive_videos', []).then(function(data){
+    videoItems = data;
+    renderVideos();
+  });
+
+  addVideoBtn.addEventListener('click', function(){ videoInput.click(); });
+  videoInput.addEventListener('change', function(){
+    var file = this.files[0];
+    if (!file) return;
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024){
+      showAdminNotice('Vídeo maior que ' + MAX_VIDEO_MB + 'MB — escolha um arquivo menor.', true);
+      videoInput.value = '';
+      return;
+    }
+    showAdminNotice('Enviando vídeo...', true);
+    uploadVideoBlob(file).then(function(url){
+      videoItems.push({ id: 'vid_' + Date.now(), url: url });
+      saveVideos();
+      renderVideos();
+      videoInput.value = '';
+    }).catch(function(){
+      showAdminNotice('Falha ao enviar o vídeo. Verifique sua conexão, o tamanho do arquivo e se o bucket "site-videos" existe no Supabase.', true);
+      videoInput.value = '';
     });
   });
 
@@ -2098,7 +2245,7 @@
       localStorage.removeItem('__diag_test__');
     } catch(e){ testOk = false; }
     lines.push('localStorage (assinantes, teste grátis) funciona: ' + (testOk ? 'SIM' : 'NÃO — este é o problema'));
-    lines.push('Supabase conectado (capa, catálogo, galeria, fundo, categorias, planos): ' + (supabaseClient ? 'SIM' : 'NÃO — este é o problema'));
+    lines.push('Supabase conectado (capa, catálogo, galeria, vídeos, fundo, categorias, planos): ' + (supabaseClient ? 'SIM' : 'NÃO — este é o problema'));
     lines.push('');
 
     var raw = null;
@@ -2118,6 +2265,7 @@
       ['aclive_hero_slides', 'Capa (slideshow)'],
       ['aclive_catalog', 'Catálogo (gêneros)'],
       ['aclive_gallery', 'Galeria de imagens'],
+      ['aclive_videos', 'Vídeos'],
       ['aclive_page_bg', 'Fundo da página'],
       ['aclive_categories', 'Categorias (pills)'],
       ['aclive_plans', 'Preços dos planos'],
@@ -2775,6 +2923,7 @@
       scSet('aclive_hero_slides', heroSlidesData),
       scSet('aclive_catalog', catalog),
       scSet('aclive_gallery', galleryItems),
+      scSet('aclive_videos', videoItems),
       scSet('aclive_page_bg', pageBgData),
       scSet('aclive_categories', categories),
       scSet('aclive_plans', plans),
